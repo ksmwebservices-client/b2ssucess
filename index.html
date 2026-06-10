@@ -1428,104 +1428,149 @@ function openModal() { document.getElementById('successModal').classList.add('op
 function closeModal() { document.getElementById('successModal').classList.remove('open'); }
 
 // ── form submit ────────────────────────────────────────────────────────────
+// ── helpers: sanitise form values before sending to Postgres ──────────────
+// Postgres is strict: numeric columns reject "", date columns reject ""
+// These helpers convert blank strings to null so every type is safe.
+function str(v)  { const s = (v || '').trim(); return s === '' ? null : s; }
+function num(v)  { const n = parseFloat(v); return isNaN(n) ? null : n; }
+function int_(v) { const n = parseInt(v);   return isNaN(n) ? null : n; }
+function dt(v)   { const s = (v || '').trim(); return s === '' ? null : s; }
+
 async function submitForm(e) {
   e.preventDefault();
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.innerHTML = '<span>⏳ Submitting…</span>';
 
-  const form = document.getElementById('loanForm');
-  const data = Object.fromEntries(new FormData(form).entries());
+  const form   = document.getElementById('loanForm');
+  const raw    = Object.fromEntries(new FormData(form).entries());
 
   try {
-    // 1. Insert application record
-    const { data: appRecord, error: appErr } = await sb
+    // ── 1. Build a clean payload — every column typed correctly ────────
+    const payload = {
+      // Loan
+      loan_type:            str(raw.loan_type),
+      loan_amount:          num(raw.loan_amount),
+      tenure:               int_(raw.tenure),
+      purpose:              str(raw.purpose),
+      // Personal
+      name:                 str(raw.name),
+      dob:                  dt(raw.dob),
+      mobile:               str(raw.mobile),
+      alt_mobile:           str(raw.alt_mobile),
+      aadhaar:              str(raw.aadhaar),
+      pan:                  str(raw.pan),
+      email_official:       str(raw.email_official),
+      email_personal:       str(raw.email_personal),
+      father_name:          str(raw.father_name),
+      mother_name:          str(raw.mother_name),
+      spouse_name:          str(raw.spouse_name),
+      spouse_dob:           dt(raw.spouse_dob),       // was "" → caused type error
+      landline:             str(raw.landline),
+      qualifications:       str(raw.qualifications),
+      // Address
+      home_address:         str(raw.home_address),
+      home_landmark:        str(raw.home_landmark),
+      resi_type:            str(raw.resi_type),
+      resi_duration:        str(raw.resi_duration),
+      // Employment
+      company_name:         str(raw.company_name),
+      company_address:      str(raw.company_address),
+      company_phone:        str(raw.company_phone),
+      company_landmark:     str(raw.company_landmark),
+      designation:          str(raw.designation),
+      salary_gross:         num(raw.salary_gross),    // was "" → caused type error
+      salary_takehome:      num(raw.salary_takehome),
+      exp_current:          str(raw.exp_current),
+      exp_total:            str(raw.exp_total),
+      // References
+      ref1_name:            str(raw.ref1_name),
+      ref1_number:          str(raw.ref1_number),
+      ref1_address:         str(raw.ref1_address),
+      ref1_relation:        str(raw.ref1_relation),
+      ref2_name:            str(raw.ref2_name),
+      ref2_number:          str(raw.ref2_number),
+      ref2_address:         str(raw.ref2_address),
+      ref2_relation:        str(raw.ref2_relation),
+      // Nominee
+      nominee_name:         str(raw.nominee_name),
+      nominee_dob:          dt(raw.nominee_dob),      // was "" → caused type error
+      nominee_relation:     str(raw.nominee_relation),
+      // Existing loan
+      existing_lender:      str(raw.existing_lender),
+      existing_loan_type:   str(raw.existing_loan_type),
+      existing_outstanding: num(raw.existing_outstanding),
+      existing_emi:         num(raw.existing_emi),
+      // Admin
+      status: 'New',
+    };
+
+    console.log('[B2S] Inserting payload:', payload);
+
+    // ── 2. Insert — NO .select().single() after insert for anon ───────
+    // .select() after insert triggers a SELECT RLS check; anon has no
+    // SELECT policy, so it throws 42501. We use a workaround: insert
+    // with a returning header via the prefer option, or simply read
+    // the generated id from the insert response data array.
+    const { data: insertData, error: appErr } = await sb
       .from('loan_applications')
-      .insert([{
-        loan_type: data.loan_type,
-        loan_amount: data.loan_amount,
-        tenure: data.tenure || null,
-        purpose: data.purpose,
-        name: data.name,
-        dob: data.dob,
-        mobile: data.mobile,
-        alt_mobile: data.alt_mobile || null,
-        aadhaar: data.aadhaar,
-        pan: data.pan,
-        email_official: data.email_official || null,
-        email_personal: data.email_personal,
-        father_name: data.father_name || null,
-        mother_name: data.mother_name || null,
-        spouse_name: data.spouse_name || null,
-        spouse_dob: data.spouse_dob || null,
-        landline: data.landline || null,
-        qualifications: data.qualifications || null,
-        home_address: data.home_address,
-        home_landmark: data.home_landmark || null,
-        resi_type: data.resi_type || null,
-        resi_duration: data.resi_duration || null,
-        company_name: data.company_name,
-        company_address: data.company_address || null,
-        company_phone: data.company_phone || null,
-        company_landmark: data.company_landmark || null,
-        designation: data.designation || null,
-        salary_gross: data.salary_gross || null,
-        salary_takehome: data.salary_takehome || null,
-        exp_current: data.exp_current || null,
-        exp_total: data.exp_total || null,
-        ref1_name: data.ref1_name || null,
-        ref1_number: data.ref1_number || null,
-        ref1_address: data.ref1_address || null,
-        ref1_relation: data.ref1_relation || null,
-        ref2_name: data.ref2_name || null,
-        ref2_number: data.ref2_number || null,
-        ref2_address: data.ref2_address || null,
-        ref2_relation: data.ref2_relation || null,
-        nominee_name: data.nominee_name || null,
-        nominee_dob: data.nominee_dob || null,
-        nominee_relation: data.nominee_relation || null,
-        existing_lender: data.existing_lender || null,
-        existing_loan_type: data.existing_loan_type || null,
-        existing_outstanding: data.existing_outstanding || null,
-        existing_emi: data.existing_emi || null,
-        status: 'New',
-      }])
-      .select()
-      .single();
+      .insert([payload])
+      .select('id');   // only fetch id — works because insert+select
+                       // uses the same INSERT policy, not SELECT
 
-    if (appErr) throw appErr;
-    const appId = appRecord.id;
+    if (appErr) {
+      console.error('[B2S] Insert error:', JSON.stringify(appErr, null, 2));
+      throw new Error(`DB insert failed: ${appErr.message} (code ${appErr.code})`);
+    }
 
-    // 2. Upload documents
+    const appId = insertData[0].id;
+    console.log('[B2S] Application created, id:', appId);
+
+    // ── 3. Upload documents ────────────────────────────────────────────
     const fileInputs = form.querySelectorAll('input[type="file"]');
     for (const fi of fileInputs) {
       if (!fi.files.length) continue;
       const label = fi.dataset.label;
       for (const file of fi.files) {
-        const path = `${appId}/${label}_${Date.now()}_${file.name}`;
+        // Sanitise filename: remove spaces/special chars that break storage paths
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${appId}/${label}_${Date.now()}_${safeName}`;
+
         const { error: upErr } = await sb.storage
           .from('loan-documents')
           .upload(path, file, { cacheControl: '3600', upsert: false });
-        if (upErr) console.warn('Upload warn:', upErr.message);
 
-        // record in documents table
-        await sb.from('loan_documents').insert([{
+        if (upErr) {
+          console.warn('[B2S] Storage upload warn:', upErr.message, path);
+          // Don't block submission — log and continue
+          continue;
+        }
+
+        // Record in loan_documents table
+        const { error: docErr } = await sb.from('loan_documents').insert([{
           application_id: appId,
-          doc_label: label,
-          file_name: file.name,
-          storage_path: path,
+          doc_label:      label,
+          file_name:      file.name,
+          storage_path:   path,
         }]);
+        if (docErr) {
+          console.warn('[B2S] loan_documents insert warn:', docErr.message);
+        }
       }
     }
 
-    // 3. Success UI
+    // ── 4. Success UI ──────────────────────────────────────────────────
     form.reset();
-    document.querySelectorAll('.u-name').forEach(el => { el.textContent = 'Click to upload'; el.style.color = ''; });
+    document.querySelectorAll('.u-name').forEach(el => {
+      el.textContent = 'Click to upload';
+      el.style.color = '';
+    });
     openModal();
 
   } catch (err) {
-    console.error(err);
-    showToast('⚠️ Error submitting. Please check your connection and try again.');
+    console.error('[B2S] submitForm error:', err);
+    console.error('[B2S] Detail:', JSON.stringify(err, null, 2));
+    showToast('⚠️ ' + (err.message || 'Error submitting. Please try again.'));
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<span>🚀 Submit Application</span>';
