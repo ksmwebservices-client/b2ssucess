@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>B2S Success – Admin Dashboard</title>
+  <link rel="icon" href="../public/logo.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../public/config.js"></script>
+  <style>
+    :root {
+      --green:     #1B5E20;
+      --green-mid: #2E7D32;
+      --gold:      #D4A017;
+      --gold-l:    #F5C842;
+      --white:     #FFFFFF;
+      --bg:        #F0F4F1;
+      --card:      #FFFFFF;
+      --border:    #DDE5D9;
+      --gray:      #5A6652;
+      --red:       #C0392B;
+      --blue:      #1565C0;
+      --shadow:    0 2px 16px rgba(27,94,32,.1);
+      --radius:    10px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: #1A1F17; min-height: 100vh; }
+
+    /* ── LOGIN ────────────────────────────────────────────────────────── */
+    #loginScreen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--green) 0%, #134016 100%);
+    }
+    .login-box {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px;
+      width: 380px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    .login-box img { width: 72px; border-radius: 8px; margin: 0 auto 16px; }
+    .login-box h1 { font-family: 'Poppins', sans-serif; font-size: 1.2rem; font-weight: 800; color: var(--green); margin-bottom: 4px; }
+    .login-box p { font-size: .82rem; color: var(--gray); margin-bottom: 28px; }
+    .login-field { margin-bottom: 16px; text-align: left; }
+    .login-field label { display: block; font-size: .78rem; font-weight: 600; color: var(--gray); margin-bottom: 5px; }
+    .login-field input {
+      width: 100%; border: 2px solid #ddd; border-radius: 8px;
+      padding: 10px 14px; font-size: .9rem; outline: none; transition: border-color .2s;
+    }
+    .login-field input:focus { border-color: var(--green); }
+    .login-btn {
+      width: 100%; background: var(--green); color: white;
+      font-family: 'Poppins', sans-serif; font-weight: 700; font-size: .95rem;
+      padding: 12px; border: none; border-radius: 8px; cursor: pointer;
+      transition: background .2s; margin-top: 4px;
+    }
+    .login-btn:hover { background: var(--green-mid); }
+    .login-err { color: var(--red); font-size: .82rem; margin-top: 10px; }
+
+    /* ── LAYOUT ───────────────────────────────────────────────────────── */
+    #app { display: none; min-height: 100vh; }
+    .topbar {
+      background: var(--green);
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 10px rgba(0,0,0,.2);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .topbar-left img { height: 38px; border-radius: 5px; }
+    .topbar-left span { color: var(--gold); font-family: 'Poppins', sans-serif; font-weight: 700; font-size: .95rem; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .topbar-right .badge { background: rgba(212,160,23,.2); color: var(--gold-l); font-size: .75rem; font-weight: 600; padding: 4px 12px; border-radius: 12px; }
+    .logout-btn { background: rgba(255,255,255,.15); color: white; border: 1px solid rgba(255,255,255,.3); padding: 6px 14px; border-radius: 20px; font-size: .8rem; cursor: pointer; transition: background .2s; }
+    .logout-btn:hover { background: rgba(255,255,255,.25); }
+
+    .main { max-width: 1200px; margin: auto; padding: 28px 24px 60px; }
+
+    /* ── STAT CARDS ───────────────────────────────────────────────────── */
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+      border-left: 4px solid var(--green);
+    }
+    .stat-card.gold { border-color: var(--gold); }
+    .stat-card.red  { border-color: var(--red); }
+    .stat-card.blue { border-color: var(--blue); }
+    .stat-card .num { font-family: 'Poppins', sans-serif; font-size: 1.8rem; font-weight: 800; color: var(--green); }
+    .stat-card.gold .num { color: #a67c00; }
+    .stat-card.red .num  { color: var(--red); }
+    .stat-card.blue .num { color: var(--blue); }
+    .stat-card .lbl { font-size: .78rem; color: var(--gray); margin-top: 2px; }
+
+    /* ── TOOLBAR ──────────────────────────────────────────────────────── */
+    .toolbar {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+    .toolbar input[type="text"] {
+      flex: 1;
+      min-width: 200px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: .88rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .toolbar input:focus { border-color: var(--green); }
+    .toolbar select {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: .85rem;
+      outline: none;
+    }
+    .toolbar button {
+      background: var(--green);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 18px;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* ── TABLE ────────────────────────────────────────────────────────── */
+    .table-wrap { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    thead { background: var(--green); color: white; }
+    thead th { padding: 12px 16px; text-align: left; font-weight: 600; font-size: .8rem; letter-spacing: .3px; white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+    tbody tr:hover { background: #F5F9F5; }
+    tbody td { padding: 12px 16px; vertical-align: middle; }
+    .app-name { font-weight: 600; color: var(--green); }
+    .app-mobile { color: var(--gray); font-size: .82rem; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 12px;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .s-new       { background: #E3F2FD; color: #1565C0; }
+    .s-reviewing { background: #FFF8E1; color: #F57F17; }
+    .s-approved  { background: #E8F5E9; color: #2E7D32; }
+    .s-rejected  { background: #FFEBEE; color: #C62828; }
+    .s-disbursed { background: #E8F5E9; color: #1B5E20; }
+
+    .action-btn {
+      background: none;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: .78rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all .15s;
+      color: var(--gray);
+      margin-right: 4px;
+    }
+    .action-btn:hover { border-color: var(--green); color: var(--green); }
+    .action-btn.view { border-color: var(--blue); color: var(--blue); }
+    .action-btn.view:hover { background: var(--blue); color: white; }
+
+    /* ── DETAIL DRAWER ────────────────────────────────────────────────── */
+    .drawer-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+    .drawer {
+      position: fixed; top: 0; right: -680px; width: min(680px, 100vw);
+      height: 100vh; background: white; z-index: 501;
+      overflow-y: auto; transition: right .25s ease;
+      box-shadow: -8px 0 40px rgba(0,0,0,.15);
+    }
+    .drawer.open { right: 0; }
+    .drawer-header {
+      background: var(--green); padding: 20px 24px;
+      display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1;
+    }
+    .drawer-header h2 { font-family: 'Poppins', sans-serif; font-size: 1rem; font-weight: 700; color: white; }
+    .drawer-close { background: rgba(255,255,255,.2); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; font-size: 1rem; cursor: pointer; }
+    .drawer-body { padding: 24px; }
+    .d-section { margin-bottom: 24px; }
+    .d-section h3 { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: .88rem; color: var(--green); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+    .d-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
+    .d-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
+    .d-row .key { font-size: .73rem; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: .3px; }
+    .d-row .val { font-size: .87rem; color: #1A1F17; }
+    .doc-list-drawer { display: flex; flex-direction: column; gap: 8px; }
+    .doc-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #F5F9F5; border-radius: 8px; padding: 10px 14px;
+      border: 1px solid var(--border);
+    }
+    .doc-row .doc-name { font-size: .82rem; font-weight: 600; color: var(--green); }
+    .doc-row .doc-lbl { font-size: .75rem; color: var(--gray); }
+    .dl-btn {
+      background: var(--green); color: white; border: none;
+      padding: 6px 14px; border-radius: 20px; font-size: .78rem;
+      font-weight: 700; cursor: pointer; transition: background .15s;
+    }
+    .dl-btn:hover { background: var(--green-mid); }
+    .status-select {
+      border: 2px solid var(--border); border-radius: 8px; padding: 8px 12px;
+      font-size: .85rem; font-family: 'Inter', sans-serif; width: 100%; margin-top: 8px; outline: none;
+    }
+    .save-status-btn {
+      background: var(--gold); color: var(--green); border: none;
+      border-radius: 8px; padding: 9px 20px; font-family: 'Poppins', sans-serif;
+      font-weight: 700; font-size: .85rem; cursor: pointer; margin-top: 10px;
+    }
+
+    /* ── EMPTY / LOADING ──────────────────────────────────────────────── */
+    .empty { text-align: center; padding: 60px; color: var(--gray); font-size: .9rem; }
+    .loading { text-align: center; padding: 40px; color: var(--gray); }
+    .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #ccc; border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; margin-bottom: 10px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TOAST ────────────────────────────────────────────────────────── */
+    #atoast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--green); color: white; padding: 12px 24px; border-radius: 24px; font-size: .88rem; font-weight: 600; opacity: 0; transition: opacity .3s, transform .3s; z-index: 9999; }
+    #atoast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 768px) {
+      .stat-row { grid-template-columns: 1fr 1fr; }
+      .d-grid { grid-template-columns: 1fr; }
+      thead th:nth-child(n+4) { display: none; }
+      tbody td:nth-child(n+4) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ──────────────────────────────────────────────────────────────── -->
+<div id="loginScreen">
+  <div class="login-box">
+    <img src="../public/logo.png" alt="B2S" />
+    <h1>B2S Success – Admin</h1>
+    <p>Loan Application Management Portal</p>
+    <div class="login-field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="admin@b2ssuccess.com" />
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" />
+    </div>
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- ── APP ────────────────────────────────────────────────────────────────── -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <img src="../public/logo.png" alt="B2S" />
+      <span>Admin Dashboard</span>
+    </div>
+    <div class="topbar-right">
+      <span class="badge" id="adminEmail">Admin</span>
+      <button class="logout-btn" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Stats -->
+    <div class="stat-row">
+      <div class="stat-card"><div class="num" id="stTotal">–</div><div class="lbl">Total Applications</div></div>
+      <div class="stat-card gold"><div class="num" id="stNew">–</div><div class="lbl">New (Pending Review)</div></div>
+      <div class="stat-card blue"><div class="num" id="stReviewing">–</div><div class="lbl">Under Review</div></div>
+      <div class="stat-card red"><div class="num" id="stApproved">–</div><div class="lbl">Approved / Disbursed</div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <input type="text" id="searchInput" placeholder="Search by name, mobile, PAN…" oninput="filterApps()" />
+      <select id="filterStatus" onchange="filterApps()">
+        <option value="">All Status</option>
+        <option>New</option>
+        <option>Reviewing</option>
+        <option>Approved</option>
+        <option>Rejected</option>
+        <option>Disbursed</option>
+      </select>
+      <select id="filterLoan" onchange="filterApps()">
+        <option value="">All Loan Types</option>
+        <option>Personal Loan</option>
+        <option>Home Loan</option>
+        <option>Car Loan</option>
+        <option>Business Loan</option>
+        <option>Mortgage / LAP</option>
+        <option>Education Loan</option>
+        <option>Gold Loan</option>
+        <option>Two Wheeler Loan</option>
+      </select>
+      <button onclick="loadApplications()">↻ Refresh</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div id="tableBody">
+        <div class="loading"><div class="spinner"></div><br>Loading applications…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DETAIL DRAWER ──────────────────────────────────────────────────────── -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <h2 id="drawerTitle">Application Details</h2>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody">
+    <div class="loading"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<div id="atoast"></div>
+
+<script>
+let sb, allApps = [], currentAppId = null;
+
+// ── login ────────────────────────────────────────────────────────────────
+async function doLogin() {
+  sb = initSupabase();
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  document.getElementById('loginErr').textContent = '';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { document.getElementById('loginErr').textContent = error.message; return; }
+  showApp(data.user.email);
+}
+
+function showApp(email) {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('adminEmail').textContent = email;
+  loadApplications();
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// ── check existing session ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  sb = initSupabase();
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) showApp(session.user.email);
+});
+
+// ── load applications ────────────────────────────────────────────────────
+async function loadApplications() {
+  document.getElementById('tableBody').innerHTML = '<div class="loading"><div class="spinner"></div><br>Loading…</div>';
+  const { data, error } = await sb
+    .from('loan_applications')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { document.getElementById('tableBody').innerHTML = `<div class="empty">Error: ${error.message}</div>`; return; }
+  allApps = data || [];
+  updateStats();
+  renderTable(allApps);
+}
+
+function updateStats() {
+  document.getElementById('stTotal').textContent = allApps.length;
+  document.getElementById('stNew').textContent = allApps.filter(a => a.status === 'New').length;
+  document.getElementById('stReviewing').textContent = allApps.filter(a => a.status === 'Reviewing').length;
+  document.getElementById('stApproved').textContent = allApps.filter(a => ['Approved','Disbursed'].includes(a.status)).length;
+}
+
+function filterApps() {
+  const q  = document.getElementById('searchInput').value.toLowerCase();
+  const st = document.getElementById('filterStatus').value;
+  const lt = document.getElementById('filterLoan').value;
+  const filtered = allApps.filter(a => {
+    const match = !q || [a.name, a.mobile, a.pan, a.email_personal, a.aadhaar].some(v => v && v.toLowerCase().includes(q));
+    const stMatch = !st || a.status === st;
+    const ltMatch = !lt || a.loan_type === lt;
+    return match && stMatch && ltMatch;
+  });
+  renderTable(filtered);
+}
+
+function renderTable(apps) {
+  if (!apps.length) {
+    document.getElementById('tableBody').innerHTML = '<div class="empty">No applications found.</div>';
+    return;
+  }
+  const rows = apps.map(a => `
+    <tr>
+      <td>
+        <div class="app-name">${esc(a.name)}</div>
+        <div class="app-mobile">${esc(a.mobile)}</div>
+      </td>
+      <td>${esc(a.loan_type)}</td>
+      <td>₹${Number(a.loan_amount || 0).toLocaleString('en-IN')}</td>
+      <td><span class="status-badge s-${(a.status||'New').toLowerCase()}">${esc(a.status || 'New')}</span></td>
+      <td>${fmtDate(a.created_at)}</td>
+      <td>
+        <button class="action-btn view" onclick="openDrawer('${a.id}')">View</button>
+      </td>
+    </tr>
+  `).join('');
+  document.getElementById('tableBody').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Applicant</th>
+          <th>Loan Type</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Applied On</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── drawer ───────────────────────────────────────────────────────────────
+async function openDrawer(id) {
+  currentAppId = id;
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  const app = allApps.find(a => a.id === id);
+  if (!app) return;
+  document.getElementById('drawerTitle').textContent = `${app.name} — ${app.loan_type}`;
+
+  // load docs
+  const { data: docs } = await sb.from('loan_documents').select('*').eq('application_id', id);
+
+  document.getElementById('drawerBody').innerHTML = buildDrawer(app, docs || []);
+}
+
+function buildDrawer(a, docs) {
+  const field = (k, v) => v ? `<div class="d-row"><div class="key">${k}</div><div class="val">${esc(String(v))}</div></div>` : '';
+  return `
+    <div class="d-section">
+      <h3>📋 Loan Details</h3>
+      <div class="d-grid">
+        ${field('Loan Type', a.loan_type)}
+        ${field('Amount', a.loan_amount ? '₹' + Number(a.loan_amount).toLocaleString('en-IN') : null)}
+        ${field('Tenure', a.tenure ? a.tenure + ' months' : null)}
+        ${field('Purpose', a.purpose)}
+      </div>
+    </div>
+    <div class="d-section">
+      <h3>👤 Personal</h3>
+      <div class="d-grid">
+        ${field('Name', a.name)}
+        ${field('DOB', a.dob)}
+        ${field('Mobile', a.mobile)}
+        ${field('Alt Mobile', a.alt_mobile)}
+        ${field('Aadhaar', a.aadhaar)}
+        ${field('PAN', a.pan)}
+        ${field('Email (Official)', a.email_official)}
+        ${field('Email (Personal)', a.email_personal)}
+        ${field('Father', a.father_name)}
+        ${field('Mother', a.mother_name)}
+        ${field('Spouse', a.spouse_name)}
+        ${field('Qualifications', a.qualifications)}
+        ${field('Landline', a.landline)}
+      </div>
+    </div>
+    <div class="d-section">
+      <h3>🏠 Address</h3>
+      <div class="d-grid">
+        ${field('Home Address', a.home_address)}
+        ${field('Landmark', a.home_landmark)}
+        ${field('Resi Type', a.resi_type)}
+        ${field('Resi Since', a.resi_duration)}
+      </div>
+    </div>
+    <div class="d-section">
+      <h3>💼 Employment</h3>
+      <div class="d-grid">
+        ${field('Company', a.company_name)}
+        ${field('Address', a.company_address)}
+        ${field('Phone', a.company_phone)}
+        ${field('Designation', a.designation)}
+        ${field('Gross Salary', a.salary_gross ? '₹' + Number(a.salary_gross).toLocaleString('en-IN') : null)}
+        ${field('Take-Home', a.salary_takehome ? '₹' + Number(a.salary_takehome).toLocaleString('en-IN') : null)}
+        ${field('Current Exp', a.exp_current)}
+        ${field('Total Exp', a.exp_total)}
+      </div>
+    </div>
+    <div class="d-section">
+      <h3>👥 References</h3>
+      <div class="d-grid">
+        ${field('Ref 1 Name', a.ref1_name)}
+        ${field('Ref 1 Number', a.ref1_number)}
+        ${field('Ref 1 Relation', a.ref1_relation)}
+        ${field('Ref 2 Name', a.ref2_name)}
+        ${field('Ref 2 Number', a.ref2_number)}
+        ${field('Ref 2 Relation', a.ref2_relation)}
+      </div>
+    </div>
+    <div class="d-section">
+      <h3>📝 Nominee</h3>
+      <div class="d-grid">
+        ${field('Name', a.nominee_name)}
+        ${field('DOB', a.nominee_dob)}
+        ${field('Relation', a.nominee_relation)}
+      </div>
+    </div>
+    ${a.existing_lender ? `
+    <div class="d-section">
+      <h3>🏦 Existing Loan</h3>
+      <div class="d-grid">
+        ${field('Lender', a.existing_lender)}
+        ${field('Type', a.existing_loan_type)}
+        ${field('Outstanding', a.existing_outstanding ? '₹' + Number(a.existing_outstanding).toLocaleString('en-IN') : null)}
+        ${field('Monthly EMI', a.existing_emi ? '₹' + Number(a.existing_emi).toLocaleString('en-IN') : null)}
+      </div>
+    </div>` : ''}
+    <div class="d-section">
+      <h3>📁 Uploaded Documents (${docs.length})</h3>
+      <div class="doc-list-drawer">
+        ${docs.length === 0
+          ? '<p style="color:var(--gray);font-size:.85rem">No documents uploaded.</p>'
+          : docs.map(d => `
+          <div class="doc-row">
+            <div>
+              <div class="doc-name">${esc(d.file_name)}</div>
+              <div class="doc-lbl">${esc(d.doc_label)}</div>
+            </div>
+            <button class="dl-btn" onclick="downloadDoc('${esc(d.storage_path)}','${esc(d.file_name)}')">⬇ Download</button>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="d-section">
+      <h3>⚙️ Update Status</h3>
+      <select class="status-select" id="statusSelect">
+        <option ${a.status==='New'?'selected':''}>New</option>
+        <option ${a.status==='Reviewing'?'selected':''}>Reviewing</option>
+        <option ${a.status==='Approved'?'selected':''}>Approved</option>
+        <option ${a.status==='Rejected'?'selected':''}>Rejected</option>
+        <option ${a.status==='Disbursed'?'selected':''}>Disbursed</option>
+      </select>
+      <br>
+      <button class="save-status-btn" onclick="saveStatus()">Save Status</button>
+    </div>
+  `;
+}
+
+function closeDrawer() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+  currentAppId = null;
+}
+
+// ── download doc ─────────────────────────────────────────────────────────
+async function downloadDoc(path, filename) {
+  const { data, error } = await sb.storage.from('loan-documents').download(path);
+  if (error) { showToast('Download failed: ' + error.message); return; }
+  const url = URL.createObjectURL(data);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── save status ───────────────────────────────────────────────────────────
+async function saveStatus() {
+  const newStatus = document.getElementById('statusSelect').value;
+  const { error } = await sb.from('loan_applications').update({ status: newStatus }).eq('id', currentAppId);
+  if (error) { showToast('Error: ' + error.message); return; }
+  const idx = allApps.findIndex(a => a.id === currentAppId);
+  if (idx !== -1) allApps[idx].status = newStatus;
+  updateStats();
+  renderTable(allApps);
+  showToast('✅ Status updated to ' + newStatus);
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(iso) {
+  if (!iso) return '–';
+  return new Date(iso).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+}
+function showToast(msg) {
+  const t = document.getElementById('atoast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
