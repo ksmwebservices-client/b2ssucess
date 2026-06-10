@@ -1505,25 +1505,26 @@ async function submitForm(e) {
       status: 'New',
     };
 
-    console.log('[B2S] Inserting payload:', payload);
+    // ── 2. Generate UUID client-side — no .select() after insert ──────
+    // .select() after insert fires a separate SELECT request which hits
+    // the SELECT RLS policy. Anon SELECT RLS causes 42501 regardless of
+    // how the policy is written due to Supabase's internal policy cache.
+    // Fix: generate the UUID in JS, stamp it on the payload, insert once
+    // with no return — zero SELECT calls, zero RLS conflict.
+    const appId = crypto.randomUUID();
+    payload.id = appId;
 
-    // ── 2. Insert — NO .select().single() after insert for anon ───────
-    // .select() after insert triggers a SELECT RLS check; anon has no
-    // SELECT policy, so it throws 42501. We use a workaround: insert
-    // with a returning header via the prefer option, or simply read
-    // the generated id from the insert response data array.
-    const { data: insertData, error: appErr } = await sb
+    console.log('[B2S] Inserting payload with id:', appId);
+
+    const { error: appErr } = await sb
       .from('loan_applications')
-      .insert([payload])
-      .select('id');   // only fetch id — works because insert+select
-                       // uses the same INSERT policy, not SELECT
+      .insert([payload]);
 
     if (appErr) {
       console.error('[B2S] Insert error:', JSON.stringify(appErr, null, 2));
       throw new Error(`DB insert failed: ${appErr.message} (code ${appErr.code})`);
     }
 
-    const appId = insertData[0].id;
     console.log('[B2S] Application created, id:', appId);
 
     // ── 3. Upload documents ────────────────────────────────────────────
